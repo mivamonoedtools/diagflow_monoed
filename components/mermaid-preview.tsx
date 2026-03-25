@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { DIAGRAM_RASTER_FONT_FAMILY } from "@/lib/diagram-export-font";
 import {
   DEFAULT_DIAGRAM_PALETTE_ID,
   getDiagramPalette,
@@ -53,7 +54,7 @@ export function MermaidPreview({
           startOnLoad: false,
           securityLevel: "loose",
           theme: palette.mermaidTheme,
-          fontFamily: "inherit",
+          fontFamily: DIAGRAM_RASTER_FONT_FAMILY,
           themeVariables: {
             fontSize: narrow ? "15px" : "14px",
             ...palette.themeVariables,

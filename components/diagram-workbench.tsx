@@ -44,6 +44,7 @@ import {
 } from "@/lib/diagram-palette";
 import { broadcastCreditsUpdated } from "@/lib/credits-broadcast";
 import { isOutOfCreditsMessage } from "@/lib/mermaid-error-hints";
+import { prepareSvgForRasterExport } from "@/lib/prepare-svg-for-raster";
 import { tightenSvgToContent } from "@/lib/tight-svg";
 import { cn } from "@/lib/utils";
 import { ChevronDown, Code2, Copy, Download, Eye, Loader2, PenLine } from "lucide-react";
@@ -104,12 +105,13 @@ async function svgStringToPngBlob(
   scale = 2,
   backgroundColor = "#ffffff",
 ): Promise<Blob> {
+  const safeSvg = prepareSvgForRasterExport(svg);
   const parser = new DOMParser();
-  const doc = parser.parseFromString(svg, "image/svg+xml");
+  const doc = parser.parseFromString(safeSvg, "image/svg+xml");
   const el = doc.documentElement;
   const attr = parseSvgElementSize(el);
 
-  const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+  const blob = new Blob([safeSvg], { type: "image/svg+xml;charset=utf-8" });
   const url = URL.createObjectURL(blob);
 
   const img = new Image();
