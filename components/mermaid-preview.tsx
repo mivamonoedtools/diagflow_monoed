@@ -127,7 +127,7 @@ export function MermaidPreview({
       <div
         data-diagram-palette={paletteId}
         className={cn(
-          "diagram-preview max-h-[min(70vh,900px)] overflow-auto overflow-x-auto overscroll-x-contain rounded-lg border bg-card p-3 touch-pan-x sm:p-4 [&_svg]:max-w-none [&_svg]:min-w-0",
+          "diagram-preview max-h-[min(70vh,900px)] overflow-auto overflow-x-auto overscroll-x-contain rounded-lg border bg-card p-3 touch-manipulation sm:p-4 [&_svg]:max-w-none [&_svg]:min-w-0 [-webkit-overflow-scrolling:touch]",
           paletteId === "midnight"
             ? "scheme-dark text-slate-200"
             : "scheme-light text-slate-900",
