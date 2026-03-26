@@ -5,15 +5,69 @@
 
 import { DIAGRAM_RASTER_FONT_FAMILY } from "@/lib/diagram-export-font";
 
-function stripExternalSvgImages(root: SVGSVGElement) {
-  root.querySelectorAll("image").forEach((el) => {
-    const href =
-      el.getAttribute("href") ||
-      el.getAttributeNS("http://www.w3.org/1999/xlink", "href") ||
-      "";
-    const t = href.trim();
-    if (!t || t.startsWith("data:") || t.startsWith("#")) return;
-    if (/^https?:\/\//i.test(t) || t.startsWith("//")) el.remove();
+const XLINK_NS = "http://www.w3.org/1999/xlink";
+const EXTERNAL_REF_RE = /^(https?:)?\/\//i;
+const EXTERNAL_CSS_URL_RE = /url\(\s*(['"]?)(.*?)\1\s*\)/gi;
+
+function isExternalRef(value: string): boolean {
+  return EXTERNAL_REF_RE.test(value.trim());
+}
+
+function scrubExternalCssUrls(input: string): string {
+  return input.replace(EXTERNAL_CSS_URL_RE, (full, _quote, rawUrl: string) => {
+    return isExternalRef(rawUrl) ? "none" : full;
+  });
+}
+
+function scrubStyleBlockCss(input: string): string {
+  return scrubExternalCssUrls(input).replace(/@import\s+[^;]+;?/gi, "");
+}
+
+function stripExternalSvgResources(root: SVGSVGElement) {
+  root.querySelectorAll("*").forEach((el) => {
+    const href = el.getAttribute("href") || el.getAttributeNS(XLINK_NS, "href") || "";
+    const src = el.getAttribute("src") || "";
+    if ((href && isExternalRef(href)) || (src && isExternalRef(src))) {
+      el.remove();
+      return;
+    }
+
+    const styleAttr = el.getAttribute("style");
+    if (styleAttr) {
+      const scrubbed = scrubExternalCssUrls(styleAttr);
+      if (scrubbed.trim()) {
+        el.setAttribute("style", scrubbed);
+      } else {
+        el.removeAttribute("style");
+      }
+    }
+
+    // Keep local defs (`url(#id)`) but remove cross-origin URL refs.
+    [
+      "fill",
+      "stroke",
+      "filter",
+      "clip-path",
+      "mask",
+      "marker-start",
+      "marker-mid",
+      "marker-end",
+    ].forEach((attr) => {
+      const value = el.getAttribute(attr);
+      if (!value) return;
+      const scrubbed = scrubExternalCssUrls(value);
+      if (scrubbed !== value) {
+        if (scrubbed.trim()) {
+          el.setAttribute(attr, scrubbed);
+        } else {
+          el.removeAttribute(attr);
+        }
+      }
+    });
+  });
+
+  root.querySelectorAll("style").forEach((styleEl) => {
+    styleEl.textContent = scrubStyleBlockCss(styleEl.textContent ?? "");
   });
 }
 
@@ -35,7 +89,7 @@ export function prepareSvgForRasterExport(svg: string): string {
   const root = doc.documentElement;
   if (!(root instanceof SVGSVGElement)) return svg;
 
-  stripExternalSvgImages(root);
+  stripExternalSvgResources(root);
   appendFontLockStyle(doc, root);
 
   return new XMLSerializer().serializeToString(root);

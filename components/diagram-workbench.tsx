@@ -115,6 +115,7 @@ async function svgStringToPngBlob(
   const url = URL.createObjectURL(blob);
 
   const img = new Image();
+  img.crossOrigin = "anonymous";
   try {
     await new Promise<void>((resolve, reject) => {
       img.onload = () => resolve();
@@ -172,11 +173,30 @@ async function svgStringToPngBlob(
     }
 
     const out = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        (b) => (b ? resolve(b) : reject(new Error("PNG export failed"))),
-        "image/png",
-        1,
-      );
+      try {
+        canvas.toBlob(
+          (b) => {
+            if (b) {
+              resolve(b);
+              return;
+            }
+            reject(new Error("PNG export failed"));
+          },
+          "image/png",
+          1,
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (/tainted canvases|securityerror/i.test(msg)) {
+          reject(
+            new Error(
+              "Browser blocked PNG export for this diagram. Try SVG download, Regenerate/Fix with AI, or a simpler diagram.",
+            ),
+          );
+          return;
+        }
+        reject(new Error(`PNG export failed: ${msg}`));
+      }
     });
     return out;
   } finally {
@@ -532,18 +552,6 @@ export function DiagramWorkbench({ hidePageHeader = false }: DiagramWorkbenchPro
         </div>
       </section>
 
-      <DiagramFeedback
-        apiError={apiError}
-        parseError={parseError}
-        diagramKind={meta?.diagramKind ?? null}
-        canRegenerate={Boolean(prompt.trim())}
-        loading={loading}
-        repairLoading={repairLoading}
-        canRepair={Boolean(mermaidCode && parseError)}
-        onRegenerate={() => void runGenerate()}
-        onRepair={() => void runRepair()}
-      />
-
       <div className="grid gap-6 lg:grid-cols-2 lg:gap-10">
         <div className="flex flex-col gap-4">
           <div className="space-y-4">
@@ -714,6 +722,18 @@ export function DiagramWorkbench({ hidePageHeader = false }: DiagramWorkbenchPro
                 Copy
               </button>
             </div>
+
+            <DiagramFeedback
+              apiError={apiError}
+              parseError={parseError}
+              diagramKind={meta?.diagramKind ?? null}
+              canRegenerate={Boolean(prompt.trim())}
+              loading={loading}
+              repairLoading={repairLoading}
+              canRepair={Boolean(mermaidCode && parseError)}
+              onRegenerate={() => void runGenerate()}
+              onRepair={() => void runRepair()}
+            />
 
             <div
               id="diagram-preview-panel"
