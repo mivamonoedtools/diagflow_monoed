@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  /**
+   * Native server packages should stay external in Turbopack builds.
+   * @resvg/resvg-js ships native bindings used by the PNG export API route.
+   */
+  serverExternalPackages: ["@resvg/resvg-js"],
 };
 
 export default nextConfig;

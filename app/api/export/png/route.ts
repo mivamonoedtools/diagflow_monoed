@@ -1,4 +1,3 @@
-import { Resvg } from "@resvg/resvg-js";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -32,6 +31,7 @@ export async function POST(req: Request) {
   const { svg, backgroundColor, scale } = parsed.data;
 
   try {
+    const { Resvg } = await import("@resvg/resvg-js");
     const resvg = new Resvg(svg, {
       background: backgroundColor,
       fitTo: {
@@ -40,7 +40,8 @@ export async function POST(req: Request) {
       },
     });
     const png = resvg.render().asPng();
-    return new Response(png, {
+    const body = new Uint8Array(png);
+    return new Response(body, {
       headers: {
         "Content-Type": "image/png",
         "Cache-Control": "no-store",
