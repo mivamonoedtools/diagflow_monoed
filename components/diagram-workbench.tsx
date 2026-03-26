@@ -256,6 +256,8 @@ export function DiagramWorkbench({ hidePageHeader = false }: DiagramWorkbenchPro
   const [loading, setLoading] = useState(false);
   const [repairLoading, setRepairLoading] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [pngExporting, setPngExporting] = useState(false);
+  const [svgExporting, setSvgExporting] = useState(false);
   const [examplesCollapsed, setExamplesCollapsed] = useState(true);
   const [diagramPaletteId, setDiagramPaletteId] = useState<DiagramPaletteId>(
     DEFAULT_DIAGRAM_PALETTE_ID,
@@ -446,19 +448,29 @@ export function DiagramWorkbench({ hidePageHeader = false }: DiagramWorkbenchPro
     });
   }
 
-  function downloadSvg() {
+  async function downloadSvg() {
     if (!lastSvg) return;
-    const tight = exportSvgTight();
-    const blob = new Blob([tight], { type: "image/svg+xml;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${(meta?.title ?? "diagram").replace(/[^\w\-]+/g, "-").slice(0, 48) || "diagram"}.svg`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    setExportError(null);
+    setSvgExporting(true);
+    try {
+      const tight = exportSvgTight();
+      const blob = new Blob([tight], { type: "image/svg+xml;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${(meta?.title ?? "diagram").replace(/[^\w\-]+/g, "-").slice(0, 48) || "diagram"}.svg`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } finally {
+      // Keep feedback visible briefly so users notice export started.
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      setSvgExporting(false);
+    }
   }
 
   async function downloadPng() {
     if (!lastSvg) return;
+    setExportError(null);
+    setPngExporting(true);
     const fileName =
       `${(meta?.title ?? "diagram").replace(/[^\w\-]+/g, "-").slice(0, 48) || "diagram"}.png`;
     try {
@@ -486,6 +498,8 @@ export function DiagramWorkbench({ hidePageHeader = false }: DiagramWorkbenchPro
       setExportError(
         e instanceof Error ? e.message : "PNG export failed",
       );
+    } finally {
+      setPngExporting(false);
     }
   }
 
@@ -824,20 +838,28 @@ export function DiagramWorkbench({ hidePageHeader = false }: DiagramWorkbenchPro
             <button
               type="button"
               onClick={() => void downloadPng()}
-              disabled={!hasMountedClient || !lastSvg}
+              disabled={!hasMountedClient || !lastSvg || pngExporting || svgExporting}
               className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm disabled:pointer-events-none disabled:opacity-50 sm:flex-none"
             >
-              <Download className="size-4" aria-hidden />
-              Download PNG
+              {pngExporting ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <Download className="size-4" aria-hidden />
+              )}
+              {pngExporting ? "Downloading PNG..." : "Download PNG"}
             </button>
             <button
               type="button"
-              onClick={downloadSvg}
-              disabled={!hasMountedClient || !lastSvg}
+              onClick={() => void downloadSvg()}
+              disabled={!hasMountedClient || !lastSvg || pngExporting || svgExporting}
               className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-muted/60 disabled:pointer-events-none disabled:opacity-50 sm:flex-none"
             >
-              <Download className="size-4" aria-hidden />
-              Download SVG
+              {svgExporting ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <Download className="size-4" aria-hidden />
+              )}
+              {svgExporting ? "Downloading SVG..." : "Download SVG"}
             </button>
           </div>
           <p className="text-xs text-muted-foreground">

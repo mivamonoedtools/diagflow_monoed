@@ -1,3 +1,5 @@
+import { access } from "node:fs/promises";
+import path from "node:path";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -11,6 +13,29 @@ const requestSchema = z.object({
     .default("#ffffff"),
   scale: z.number().min(1).max(4).optional().default(2),
 });
+
+function normalizeSvgForServerRaster(svg: string): string {
+  const styleTag =
+    '<style>svg, text, tspan { font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important; }</style>';
+  if (/<\/svg>\s*$/i.test(svg)) {
+    return svg.replace(/<\/svg>\s*$/i, `${styleTag}</svg>`);
+  }
+  return svg;
+}
+
+async function getServerFontFiles(): Promise<string[]> {
+  const candidates = [path.join(process.cwd(), "app", "fonts", "Circular_Std_Book.ttf")];
+  const found: string[] = [];
+  for (const candidate of candidates) {
+    try {
+      await access(candidate);
+      found.push(candidate);
+    } catch {
+      /* Optional font file may not exist at runtime */
+    }
+  }
+  return found;
+}
 
 export async function POST(req: Request) {
   let json: unknown;
@@ -32,11 +57,18 @@ export async function POST(req: Request) {
 
   try {
     const { Resvg } = await import("@resvg/resvg-js");
-    const resvg = new Resvg(svg, {
+    const fontFiles = await getServerFontFiles();
+    const safeSvg = normalizeSvgForServerRaster(svg);
+    const resvg = new Resvg(safeSvg, {
       background: backgroundColor,
       fitTo: {
         mode: "zoom",
         value: scale,
+      },
+      font: {
+        fontFiles,
+        loadSystemFonts: true,
+        defaultFontFamily: "Arial",
       },
     });
     const png = resvg.render().asPng();
