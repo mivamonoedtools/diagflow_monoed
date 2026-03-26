@@ -51,6 +51,7 @@ import { ChevronDown, Code2, Copy, Download, Eye, Loader2, PenLine } from "lucid
 import { toast } from "sonner";
 
 const EXPORT_MARGIN = 12;
+const PNG_EXPORT_BACKGROUND = "#ffffff";
 
 /** Avoid "Canvas is already in error state" from huge bitmaps or invalid dimensions. */
 const MAX_CANVAS_EDGE_PX = 8192;
@@ -206,13 +207,15 @@ async function svgStringToPngBlob(
 
 async function exportPngViaServer(
   svg: string,
+  mermaidCode: string | null,
+  mermaidTheme: "default" | "base" | "dark" | "forest" | "neutral",
   scale = 2,
   backgroundColor = "#ffffff",
 ): Promise<Blob> {
   const res = await fetch("/api/export/png", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ svg, scale, backgroundColor }),
+    body: JSON.stringify({ svg, mermaidCode, mermaidTheme, scale, backgroundColor }),
   });
   if (!res.ok) {
     let message = "Server PNG export failed";
@@ -231,6 +234,10 @@ async function exportPngViaServer(
     throw new Error("Server PNG export returned empty file");
   }
   return blob;
+}
+
+function isCanvasSecurityExportError(message: string): boolean {
+  return /tainted canvases|securityerror|browser blocked png export/i.test(message);
 }
 
 type DiagramWorkbenchProps = {
@@ -476,15 +483,22 @@ export function DiagramWorkbench({ hidePageHeader = false }: DiagramWorkbenchPro
     try {
       const tight = exportSvgTight();
       const rasterSafe = prepareSvgForRasterExport(tight);
-      const bg = getDiagramPalette(diagramPaletteId).pngBackground;
+      const palette = getDiagramPalette(diagramPaletteId);
+      const bg = PNG_EXPORT_BACKGROUND;
       const scale = 2;
       let blob: Blob;
       try {
         blob = await svgStringToPngBlob(rasterSafe, scale, bg);
       } catch (clientErr) {
         const msg = clientErr instanceof Error ? clientErr.message : String(clientErr);
-        if (/tainted canvases|securityerror|browser blocked png export/i.test(msg)) {
-          blob = await exportPngViaServer(rasterSafe, scale, bg);
+        if (isCanvasSecurityExportError(msg)) {
+          blob = await exportPngViaServer(
+            rasterSafe,
+            mermaidCode,
+            palette.mermaidTheme,
+            scale,
+            bg,
+          );
         } else {
           throw clientErr;
         }
@@ -863,7 +877,7 @@ export function DiagramWorkbench({ hidePageHeader = false }: DiagramWorkbenchPro
             </button>
           </div>
           <p className="text-xs text-muted-foreground">
-            PNG is 2× resolution with a background that matches the color preset—best for
+            PNG is 2× resolution with a white background—best for
             documents and slides. SVG stays sharp and lightweight for editing.
             Both are trimmed to your diagram with a small margin.
             {meta?.diagramKind === "gantt"
