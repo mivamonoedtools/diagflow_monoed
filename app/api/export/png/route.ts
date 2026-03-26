@@ -15,8 +15,22 @@ const requestSchema = z.object({
 });
 
 function normalizeSvgForServerRaster(svg: string): string {
-  const styleTag =
-    '<style>svg, text, tspan { font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important; }</style>';
+  const styleTag = `<style>
+svg, text, tspan {
+  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important;
+  fill: #111827 !important;
+}
+.label,
+.nodeLabel,
+.cluster-label text,
+.edgeLabel text,
+.edgeLabel tspan,
+.messageText,
+.loopText,
+.noteText {
+  fill: #111827 !important;
+}
+</style>`;
   if (/<\/svg>\s*$/i.test(svg)) {
     return svg.replace(/<\/svg>\s*$/i, `${styleTag}</svg>`);
   }
