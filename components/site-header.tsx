@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { ChevronDown, Network } from "lucide-react";
+import { useEffect } from "react";
+import { ChevronDown, Loader2, Network } from "lucide-react";
 import { signOut, useSession } from "@/lib/auth-client";
 import { signInWithGoogle } from "@/lib/google-sign-in";
-import { DIAGFLOW_CREDITS_UPDATED_EVENT } from "@/lib/credits-broadcast";
+import { useCreditsStore } from "@/lib/credits-store";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,40 +15,23 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-type CreditsResponse = {
-  credits: number;
-};
-
 export function SiteHeader() {
   const { data: session } = useSession();
-  const [credits, setCredits] = useState<number | null>(null);
+  const credits = useCreditsStore((state) => state.credits);
+  const loadingCredits = useCreditsStore((state) => state.loading);
+  const clearCredits = useCreditsStore((state) => state.clearCredits);
+  const refreshCredits = useCreditsStore((state) => state.refreshCredits);
   const avatarUrl = session?.user?.image;
   const avatarLabel = session?.user?.name || session?.user?.email || "User";
   const avatarInitial = avatarLabel.slice(0, 1).toUpperCase();
 
-  const reloadCredits = useCallback(async () => {
+  useEffect(() => {
     if (!session?.user?.id) {
-      setCredits(null);
+      clearCredits();
       return;
     }
-    const res = await fetch("/api/credits", { cache: "no-store" });
-    if (!res.ok) return;
-    const data = (await res.json()) as CreditsResponse;
-    setCredits(data.credits);
-  }, [session?.user?.id]);
-
-  useEffect(() => {
-    void reloadCredits();
-  }, [reloadCredits]);
-
-  useEffect(() => {
-    const onCreditsUpdated = () => {
-      void reloadCredits();
-    };
-    window.addEventListener(DIAGFLOW_CREDITS_UPDATED_EVENT, onCreditsUpdated);
-    return () =>
-      window.removeEventListener(DIAGFLOW_CREDITS_UPDATED_EVENT, onCreditsUpdated);
-  }, [reloadCredits]);
+    void refreshCredits(session.user.id);
+  }, [clearCredits, refreshCredits, session?.user?.id]);
 
   return (
     <header className="sticky top-0 z-40  bg-white shadow-xs">
@@ -89,7 +72,17 @@ export function SiteHeader() {
                       {avatarInitial}
                     </span>
                   )}
-                  {credits ?? "..."} credits
+                  <span className="inline-flex items-center gap-1">
+                    {loadingCredits ? (
+                      <>
+                        <Loader2 className="size-3 animate-spin text-muted-foreground" aria-hidden />
+                        <span>Loading</span>
+                      </>
+                    ) : (
+                      <span>{credits ?? "..."}</span>
+                    )}{" "}
+                    credits
+                  </span>
                   <ChevronDown className="size-3.5 text-muted-foreground" aria-hidden />
                 </button>
               </DropdownMenuTrigger>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { CREDIT_PACKAGES, FREE_STARTER_CREDITS } from "@/lib/billing-config";
-import { broadcastCreditsUpdated } from "@/lib/credits-broadcast";
+import { useCreditsStore } from "@/lib/credits-store";
 import { useSession } from "@/lib/auth-client";
 import { signInWithGoogle } from "@/lib/google-sign-in";
 import { Badge } from "@/components/ui/badge";
@@ -18,11 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ArrowLeft, Check, CreditCard, Star, Zap } from "lucide-react";
-
-type CreditsResponse = {
-  credits: number;
-};
+import { ArrowLeft, Check, CreditCard, Loader2, Star, Zap } from "lucide-react";
 
 type InitPaymentResponse = {
   publicKey: string;
@@ -43,24 +39,20 @@ type VerifyPaymentResponse = {
 export default function PricingPage() {
   const router = useRouter();
   const { data: session } = useSession();
-  const [credits, setCredits] = useState<number | null>(null);
+  const credits = useCreditsStore((state) => state.credits);
+  const loadingCredits = useCreditsStore((state) => state.loading);
+  const clearCredits = useCreditsStore((state) => state.clearCredits);
+  const refreshCredits = useCreditsStore((state) => state.refreshCredits);
+  const setCredits = useCreditsStore((state) => state.setCredits);
   const [busyPackage, setBusyPackage] = useState<string | null>(null);
 
-  async function refreshCredits() {
+  useEffect(() => {
     if (!session?.user?.id) {
-      setCredits(null);
+      clearCredits();
       return;
     }
-    const res = await fetch("/api/credits", { cache: "no-store" });
-    if (!res.ok) return;
-    const data = (await res.json()) as CreditsResponse;
-    setCredits(data.credits);
-  }
-
-  useEffect(() => {
-    void refreshCredits();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.user?.id]);
+    void refreshCredits(session.user.id);
+  }, [clearCredits, refreshCredits, session?.user?.id]);
 
   const plans = useMemo(
     () =>
@@ -76,6 +68,7 @@ export default function PricingPage() {
       signInWithGoogle("/pricing");
       return;
     }
+    const userId = session.user.id;
 
     setBusyPackage(packageId);
     toast.message("Starting payment...");
@@ -121,8 +114,8 @@ export default function PricingPage() {
             return;
           }
 
-          await refreshCredits();
-          broadcastCreditsUpdated();
+          setCredits(verifyData.credits);
+          await refreshCredits(userId);
           toast.success(`Payment successful. Added ${verifyData.credited} credits.`);
           router.push("/");
         },
@@ -169,7 +162,14 @@ export default function PricingPage() {
               <span>
                 Balance:{" "}
                 <span className="font-medium text-foreground">
-                  {credits === null ? "…" : credits} credits
+                  {loadingCredits ? (
+                    <span className="inline-flex items-center gap-1 align-middle">
+                      <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-hidden />
+                      Loading credits
+                    </span>
+                  ) : (
+                    `${credits === null ? "…" : credits} credits`
+                  )}
                 </span>
               </span>
             ) : (

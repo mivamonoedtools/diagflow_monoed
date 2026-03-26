@@ -42,7 +42,7 @@ import {
   writeStoredDiagramPaletteId,
   type DiagramPaletteId,
 } from "@/lib/diagram-palette";
-import { broadcastCreditsUpdated } from "@/lib/credits-broadcast";
+import { useCreditsStore } from "@/lib/credits-store";
 import { isOutOfCreditsMessage } from "@/lib/mermaid-error-hints";
 import { prepareSvgForRasterExport } from "@/lib/prepare-svg-for-raster";
 import { tightenSvgToContent } from "@/lib/tight-svg";
@@ -204,12 +204,43 @@ async function svgStringToPngBlob(
   }
 }
 
+async function exportPngViaServer(
+  svg: string,
+  scale = 2,
+  backgroundColor = "#ffffff",
+): Promise<Blob> {
+  const res = await fetch("/api/export/png", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ svg, scale, backgroundColor }),
+  });
+  if (!res.ok) {
+    let message = "Server PNG export failed";
+    try {
+      const data: unknown = await res.json();
+      if (typeof data === "object" && data && "error" in data) {
+        message = String((data as { error: unknown }).error);
+      }
+    } catch {
+      /* keep default */
+    }
+    throw new Error(message);
+  }
+  const blob = await res.blob();
+  if (!blob || blob.size === 0) {
+    throw new Error("Server PNG export returned empty file");
+  }
+  return blob;
+}
+
 type DiagramWorkbenchProps = {
   hidePageHeader?: boolean;
 };
 
 export function DiagramWorkbench({ hidePageHeader = false }: DiagramWorkbenchProps) {
   const { data: session } = useSession();
+  const refreshCredits = useCreditsStore((state) => state.refreshCredits);
+  const setCredits = useCreditsStore((state) => state.setCredits);
   const [anonymousGenerateAvailable, setAnonymousGenerateAvailable] = useState<
     boolean | null
   >(null);
@@ -331,7 +362,12 @@ export function DiagramWorkbench({ hidePageHeader = false }: DiagramWorkbenchPro
       if (!session?.user?.id) {
         setAnonymousGenerateAvailable(false);
       } else {
-        broadcastCreditsUpdated();
+        const maybeCredits = (data as { creditsRemaining?: unknown }).creditsRemaining;
+        if (typeof maybeCredits === "number" && Number.isFinite(maybeCredits)) {
+          setCredits(maybeCredits);
+        } else {
+          void refreshCredits(session.user.id);
+        }
       }
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : "Network error";
@@ -423,13 +459,27 @@ export function DiagramWorkbench({ hidePageHeader = false }: DiagramWorkbenchPro
 
   async function downloadPng() {
     if (!lastSvg) return;
+    const fileName =
+      `${(meta?.title ?? "diagram").replace(/[^\w\-]+/g, "-").slice(0, 48) || "diagram"}.png`;
     try {
       const tight = exportSvgTight();
+      const rasterSafe = prepareSvgForRasterExport(tight);
       const bg = getDiagramPalette(diagramPaletteId).pngBackground;
-      const blob = await svgStringToPngBlob(tight, 2, bg);
+      const scale = 2;
+      let blob: Blob;
+      try {
+        blob = await svgStringToPngBlob(rasterSafe, scale, bg);
+      } catch (clientErr) {
+        const msg = clientErr instanceof Error ? clientErr.message : String(clientErr);
+        if (/tainted canvases|securityerror|browser blocked png export/i.test(msg)) {
+          blob = await exportPngViaServer(rasterSafe, scale, bg);
+        } else {
+          throw clientErr;
+        }
+      }
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `${(meta?.title ?? "diagram").replace(/[^\w\-]+/g, "-").slice(0, 48) || "diagram"}.png`;
+      a.download = fileName;
       a.click();
       URL.revokeObjectURL(a.href);
     } catch (e) {
