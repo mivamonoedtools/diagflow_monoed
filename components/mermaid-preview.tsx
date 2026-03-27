@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { DIAGRAM_RASTER_FONT_FAMILY } from "@/lib/diagram-export-font";
+import {
+  forceNormalizeSequenceControlLines,
+  normalizeMermaidForCommonSyntaxIssues,
+} from "@/lib/normalize-mermaid";
 import {
   DEFAULT_DIAGRAM_PALETTE_ID,
   getDiagramPalette,
@@ -80,7 +85,27 @@ export function MermaidPreview({
           },
         });
         const id = `mmd-${crypto.randomUUID()}`;
-        const { svg: out } = await mermaid.render(id, code.trim());
+        const firstPass = normalizeMermaidForCommonSyntaxIssues(code, "auto");
+        let out: string;
+        try {
+          const rendered = await mermaid.render(id, firstPass);
+          out = rendered.svg;
+        } catch (firstErr) {
+          const firstMsg = firstErr instanceof Error ? firstErr.message : String(firstErr);
+          const likelySequenceControlLineError = /got 'else'|got 'end'|parse error/i.test(
+            firstMsg,
+          );
+          if (!likelySequenceControlLineError) {
+            throw firstErr;
+          }
+          const retryId = `mmd-${crypto.randomUUID()}`;
+          const aggressive = normalizeMermaidForCommonSyntaxIssues(
+            forceNormalizeSequenceControlLines(code),
+            "sequence",
+          );
+          const retried = await mermaid.render(retryId, aggressive);
+          out = retried.svg;
+        }
         if (cancelled) return;
         setSvg(out);
         onRendered({ ok: true, svg: out });
@@ -110,7 +135,10 @@ export function MermaidPreview({
   if (busy && !svg) {
     return (
       <div className="flex min-h-[200px] items-center justify-center rounded-lg border bg-card text-sm text-muted-foreground">
-        Rendering diagram…
+        <span className="inline-flex items-center gap-2">
+          <Loader2 className="size-4 animate-spin" aria-hidden />
+          Rendering diagram...
+        </span>
       </div>
     );
   }

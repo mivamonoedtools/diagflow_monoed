@@ -30,7 +30,15 @@ Use --> for links. Use subgraph id [Title] ... end for groups.`,
   sequence: `sequenceDiagram
 Declare participants: participant A as Alice (optional alias), or actor User.
 Messages: A->>B: text, dashed: A-->>B, activation: activate/deactivate after a line if needed.
-Use autonumber to number steps. Notes: Note over A: text or Note right of A: text.`,
+Use autonumber to number steps. Notes: Note over A: text or Note right of A: text.
+Conditionals MUST use full multiline blocks:
+alt Token valid
+  A->>B: request
+else Token invalid
+  B-->>A: 401 Unauthorized
+end
+Use alt when you need an else branch. Do not use opt with else (opt has no else clause).
+Never place branch keywords (alt/else/end/opt/loop/par/and/break/critical) on the same line as a message.`,
 
   class: `classDiagram
 Define classes: class Animal or with members using +public -private #protected.

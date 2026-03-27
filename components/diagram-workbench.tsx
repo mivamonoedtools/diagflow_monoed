@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { MermaidPreview, type MermaidRenderResult } from "@/components/mermaid-preview";
 import { DIAGRAM_EXAMPLES } from "@/lib/diagram-examples";
@@ -16,11 +16,11 @@ import {
 import type { DiagramOutput } from "@/lib/diagram-schema";
 import {
   AlertDialog,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogMedia,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -44,14 +44,17 @@ import {
 } from "@/lib/diagram-palette";
 import { useCreditsStore } from "@/lib/credits-store";
 import { isOutOfCreditsMessage } from "@/lib/mermaid-error-hints";
+import { normalizeMermaidForCommonSyntaxIssues } from "@/lib/normalize-mermaid";
 import { prepareSvgForRasterExport } from "@/lib/prepare-svg-for-raster";
 import { tightenSvgToContent } from "@/lib/tight-svg";
 import { cn } from "@/lib/utils";
-import { ChevronDown, Code2, Copy, Download, Eye, Loader2, PenLine } from "lucide-react";
+import { ChevronDown, CircleDollarSign, Code2, Copy, Download, Eye, Loader2, PenLine } from "lucide-react";
 import { toast } from "sonner";
 
 const EXPORT_MARGIN = 12;
 const PNG_EXPORT_BACKGROUND = "#ffffff";
+const PNG_EXPORT_SCALE = 3;
+const SUPPORTED_PALETTE_IDS: readonly DiagramPaletteId[] = ["neutral", "ocean", "forest"];
 
 /** Avoid "Canvas is already in error state" from huge bitmaps or invalid dimensions. */
 const MAX_CANVAS_EDGE_PX = 8192;
@@ -245,6 +248,7 @@ type DiagramWorkbenchProps = {
 };
 
 export function DiagramWorkbench({ hidePageHeader = false }: DiagramWorkbenchProps) {
+  const router = useRouter();
   const { data: session } = useSession();
   const refreshCredits = useCreditsStore((state) => state.refreshCredits);
   const setCredits = useCreditsStore((state) => state.setCredits);
@@ -270,6 +274,7 @@ export function DiagramWorkbench({ hidePageHeader = false }: DiagramWorkbenchPro
     DEFAULT_DIAGRAM_PALETTE_ID,
   );
   const [outOfCreditsDialogOpen, setOutOfCreditsDialogOpen] = useState(false);
+  const [openingPricing, setOpeningPricing] = useState(false);
   const [diagramView, setDiagramView] = useState<"preview" | "source">("preview");
   /** Align SSR + first client paint so CTA disabled state cannot diverge (extensions/autofill/DOM drift). */
   const [hasMountedClient, setHasMountedClient] = useState(false);
@@ -279,9 +284,36 @@ export function DiagramWorkbench({ hidePageHeader = false }: DiagramWorkbenchPro
   }, []);
 
   useEffect(() => {
+    // Keep Pricing route warm so "Buy credits" opens quickly when needed.
+    router.prefetch("/pricing");
+  }, [router]);
+
+  useEffect(() => {
+    if (outOfCreditsDialogOpen) {
+      router.prefetch("/pricing");
+    } else {
+      setOpeningPricing(false);
+    }
+  }, [outOfCreditsDialogOpen, router]);
+
+  function openPricingFromCreditsDialog() {
+    setOpeningPricing(true);
+    setOutOfCreditsDialogOpen(false);
+    router.push("/pricing");
+  }
+
+  useEffect(() => {
     const stored = readStoredDiagramPaletteId();
-    if (stored) setDiagramPaletteId(stored);
+    if (stored && SUPPORTED_PALETTE_IDS.includes(stored)) {
+      setDiagramPaletteId(stored);
+      return;
+    }
+    setDiagramPaletteId(DEFAULT_DIAGRAM_PALETTE_ID);
   }, []);
+
+  const supportedPalettes = DIAGRAM_PALETTES.filter((p) =>
+    SUPPORTED_PALETTE_IDS.includes(p.id),
+  );
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches) {
@@ -365,8 +397,12 @@ export function DiagramWorkbench({ hidePageHeader = false }: DiagramWorkbenchPro
         return;
       }
       const out = data as DiagramOutput;
+      const normalizedMermaid = normalizeMermaidForCommonSyntaxIssues(
+        out.mermaid,
+        out.diagramKind,
+      );
       setMeta({ title: out.title, diagramKind: out.diagramKind });
-      setMermaidCode(out.mermaid);
+      setMermaidCode(normalizedMermaid);
       setDiagramView("preview");
       if (!session?.user?.id) {
         setAnonymousGenerateAvailable(false);
@@ -423,8 +459,12 @@ export function DiagramWorkbench({ hidePageHeader = false }: DiagramWorkbenchPro
         return;
       }
       const out = data as DiagramOutput;
+      const normalizedMermaid = normalizeMermaidForCommonSyntaxIssues(
+        out.mermaid,
+        out.diagramKind,
+      );
       setMeta({ title: out.title, diagramKind: out.diagramKind });
-      setMermaidCode(out.mermaid);
+      setMermaidCode(normalizedMermaid);
       setDiagramView("preview");
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : "Network error";
@@ -485,7 +525,7 @@ export function DiagramWorkbench({ hidePageHeader = false }: DiagramWorkbenchPro
       const rasterSafe = prepareSvgForRasterExport(tight);
       const palette = getDiagramPalette(diagramPaletteId);
       const bg = PNG_EXPORT_BACKGROUND;
-      const scale = 2;
+      const scale = PNG_EXPORT_SCALE;
       let blob: Blob;
       try {
         blob = await svgStringToPngBlob(rasterSafe, scale, bg);
@@ -726,7 +766,7 @@ export function DiagramWorkbench({ hidePageHeader = false }: DiagramWorkbenchPro
                 </span>
               </SelectTrigger>
               <SelectContent>
-                {DIAGRAM_PALETTES.map((p) => (
+                {supportedPalettes.map((p) => (
                   <SelectItem
                     key={p.id}
                     value={p.id}
@@ -903,17 +943,37 @@ export function DiagramWorkbench({ hidePageHeader = false }: DiagramWorkbenchPro
       </div>
 
       <AlertDialog open={outOfCreditsDialogOpen} onOpenChange={setOutOfCreditsDialogOpen}>
-        <AlertDialogContent size="sm" className="sm:max-w-md">
+        <AlertDialogContent
+          size="sm"
+          className="gap-4 border-border/70 bg-card/98 shadow-lg shadow-black/10 sm:max-w-md"
+        >
           <AlertDialogHeader>
+            <AlertDialogMedia className="mb-1 size-12 rounded-full bg-primary/10 text-primary ring-1 ring-primary/20">
+              <CircleDollarSign className="size-6" aria-hidden />
+            </AlertDialogMedia>
             <AlertDialogTitle>You&apos;re out of credits</AlertDialogTitle>
-            <AlertDialogDescription>
-              Grab a credit pack on Pricing to keep generating diagrams.
+            <AlertDialogDescription className="text-pretty leading-relaxed">
+              Buy a credit pack to keep generating diagrams. Your existing work stays here.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="min-h-11 sm:min-h-9">Close</AlertDialogCancel>
-            <Button asChild size="lg" className="min-h-11 w-full sm:w-auto sm:min-h-9">
-              <Link href="/pricing">Buy credits</Link>
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={() => setOutOfCreditsDialogOpen(false)}
+              className="min-h-11 sm:min-h-9"
+            >
+              Close
+            </Button>
+            <Button
+              type="button"
+              size="lg"
+              onClick={openPricingFromCreditsDialog}
+              disabled={openingPricing}
+              className="min-h-11 w-full sm:w-auto sm:min-h-9"
+            >
+              {openingPricing ? "Opening Pricing..." : "Buy credits"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -13,10 +13,16 @@ export type CreditPackage = {
 
 export const FREE_STARTER_CREDITS = 3;
 
+/** Short slug used in Paystack payment references (e.g. diagflow-basic-…). */
+export const CREDIT_PACKAGE_PAYMENT_SLUG: Record<CreditPackage["id"], string> = {
+  "starter-5": "basic",
+  "value-10": "pro",
+};
+
 export const CREDIT_PACKAGES: CreditPackage[] = [
   {
     id: "starter-5",
-    label: "Starter",
+    label: "Basic",
     amountNaira: 500,
     credits: 5,
     description: "Try the tool on a few real diagrams.",
@@ -28,7 +34,7 @@ export const CREDIT_PACKAGES: CreditPackage[] = [
   },
   {
     id: "value-10",
-    label: "Value",
+    label: "Pro",
     amountNaira: 900,
     credits: 10,
     popular: true,
@@ -36,7 +42,7 @@ export const CREDIT_PACKAGES: CreditPackage[] = [
     highlights: [
       "10 diagram generations",
       "Same exports and diagram kinds",
-      "Lower cost per credit than Starter",
+      "Lower cost per credit than Basic",
     ],
   },
 ];

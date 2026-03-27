@@ -19,6 +19,8 @@ Rules for all outputs:
 - Keep diagrams readable: avoid gigantic graphs; split complexity only if the user asks for one diagram.
 - Use ASCII-friendly labels; put spaces and punctuation inside quoted brackets/labels where needed.
 - Flowcharts: decision nodes must not mix B{...} with unquoted [ inside—use B{"Full decision text with : or / for options"} instead.
+- Sequence diagrams: branch keywords (alt/else/end/opt/loop/par/and/break/critical) must each be on their own line, never concatenated to a message line.
+- Sequence diagrams: use alt when you need else; never produce opt with else.
 - diagramKind must match what you actually generated.
 - Gantt: if the user’s dates are inconsistent with dateFormat, fix them in the mermaid (do not leave mixed formats). Repair mode must correct dateFormat and task dates together when errors mention dates or the gantt timeline.`;
 
@@ -27,6 +29,7 @@ Rules for all outputs:
 
 **Mode: repair.** You will receive invalid or broken Mermaid plus a parser error.
 Fix syntax while preserving the original intent and structure. Return the same JSON shape with corrected mermaid.
+For sequenceDiagram syntax errors involving branch keywords, ensure each else and end is on its own line and properly nested under alt/opt/par blocks.
 
 ${kindSection}`;
   }

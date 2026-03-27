@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { SupportWhatsAppBubble } from "@/components/support-whatsapp-bubble";
 import { Toaster } from "sonner";
 import { getMetadataBase, getSiteOrigin, SITE_DESCRIPTION } from "@/lib/site-url";
 
@@ -52,6 +53,7 @@ export default function RootLayout({
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <SiteFooter />
+        <SupportWhatsAppBubble />
         <Toaster richColors position="top-right" />
       </body>
     </html>

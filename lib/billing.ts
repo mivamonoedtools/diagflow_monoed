@@ -1,5 +1,6 @@
 import { mongoDb } from "@/lib/mongodb";
 import {
+  CREDIT_PACKAGE_PAYMENT_SLUG,
   FREE_STARTER_CREDITS,
   getCreditPackageById,
   type CreditPackage,
@@ -185,7 +186,9 @@ export async function createPendingPayment(
   email: string,
 ) {
   await ensureIndexes();
-  const reference = `diagflow_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  const tier = CREDIT_PACKAGE_PAYMENT_SLUG[pkg.id];
+  const suffix = Math.random().toString(36).slice(2, 10);
+  const reference = `diagflow-${tier}-${Date.now()}-${suffix}`;
   const now = new Date();
 
   await paymentCollection().insertOne({

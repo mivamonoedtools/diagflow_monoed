@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { diagramOutputSchema } from "@/lib/diagram-schema";
 import { diagramRequestSchema } from "@/lib/diagram-api-types";
 import { buildDiagramSystemPrompt } from "@/lib/diagram-prompt";
+import { normalizeMermaidForCommonSyntaxIssues } from "@/lib/normalize-mermaid";
 import {
   ANON_GENERATE_USED_COOKIE,
   ANON_TRIAL_EXHAUSTED_ERROR,
@@ -144,6 +145,14 @@ export async function POST(req: Request) {
       );
     }
 
+    const output = {
+      ...result.output,
+      mermaid: normalizeMermaidForCommonSyntaxIssues(
+        result.output.mermaid,
+        result.output.diagramKind,
+      ),
+    };
+
     if (body.mode === "generate") {
       if (userId) {
         const consumeResult = await consumeGenerationCredit(userId, {
@@ -158,10 +167,7 @@ export async function POST(req: Request) {
             { status: 402 },
           );
         }
-        return Response.json({
-          ...result.output,
-          creditsRemaining: consumeResult.balance,
-        });
+        return Response.json({ ...output, creditsRemaining: consumeResult.balance });
       }
 
       cookieStore.set(
@@ -169,10 +175,10 @@ export async function POST(req: Request) {
         "1",
         anonGenerateUsedCookieOptions(),
       );
-      return Response.json(result.output);
+      return Response.json(output);
     }
 
-    return Response.json(result.output);
+    return Response.json(output);
   } catch (e) {
     const message = e instanceof Error ? e.message : "Generation failed";
     return Response.json({ error: message }, { status: 502 });

@@ -72,22 +72,33 @@ export function SiteHeader() {
                       {avatarInitial}
                     </span>
                   )}
-                  <span className="inline-flex items-center gap-1">
-                    {loadingCredits ? (
-                      <>
-                        <Loader2 className="size-3 animate-spin text-muted-foreground" aria-hidden />
-                        <span>Loading</span>
-                      </>
-                    ) : (
-                      <span>{credits ?? "..."}</span>
-                    )}{" "}
-                    credits
+                  <span className="inline-flex items-center gap-1.5">
+                    <span
+                      className="inline-flex min-w-4.5 items-center justify-center tabular-nums"
+                      aria-busy={loadingCredits}
+                    >
+                      {loadingCredits ? (
+                        <Loader2
+                          className="size-3.5 shrink-0 animate-spin text-muted-foreground"
+                          aria-label="Loading credit balance"
+                        />
+                      ) : (
+                        <span>{credits ?? "—"}</span>
+                      )}
+                    </span>
+                    <span>credits</span>
                   </span>
                   <ChevronDown className="size-3.5 text-muted-foreground" aria-hidden />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="truncate">{avatarLabel}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/pricing" className="cursor-pointer">
+                    Pricing
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   variant="destructive"
