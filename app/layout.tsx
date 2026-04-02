@@ -12,16 +12,24 @@ const circularBook = localFont({
   variable: "--font-circular-book", // Define variable for Tailwind
 });
 
+const BASE_URL =
+  process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, "") ||
+  "https://diagflow.monoed.africa";
+
 export const metadata: Metadata = {
   metadataBase: getMetadataBase(),
   title: {
     default: "Diagflow — AI flowchart & diagram generator",
-    template: "%s · Diagflow",
+    template: "%s · Diagflow by MonoEd",
   },
   description: SITE_DESCRIPTION,
   alternates: {
     canonical: "/",
   },
+  authors: [{ name: "MonoEd Africa", url: `${BASE_URL}/about` }],
+  creator: "MonoEd Africa",
+  applicationName: "MonoEd Africa",
+  publisher: "MonoEd Africa",
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -38,6 +46,16 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon.ico", type: "image/x-icon" },
+    ],
+    apple: [
+      { url: "/favicon.ico", sizes: "180x180", type: "image/x-icon" },
+    ],
+    shortcut: "/favicon.ico",
   },
 };
 

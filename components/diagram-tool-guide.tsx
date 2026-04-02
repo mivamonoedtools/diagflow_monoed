@@ -17,7 +17,10 @@ export function DiagramToolGuide() {
           <p className="text-pretty text-sm leading-relaxed text-muted-foreground sm:text-base">
             Diagflow turns a short description into a diagram you can paste into Word, Google Docs,
             Notion, or slides. The editor below is the full tool —{" "}
-            <a href="#diagram-tool" className="font-medium text-foreground underline-offset-2 hover:underline">
+            <a
+              href="#diagram-tool"
+              className="font-medium text-foreground underline underline-offset-2 decoration-primary"
+            >
               jump to the generator
             </a>
             .
@@ -68,7 +71,10 @@ export function DiagramToolGuide() {
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             Generations use credits. You can try the tool with starter access; for ongoing use, pick a
             credit pack on{" "}
-            <Link href="/pricing" className="font-medium text-foreground underline-offset-2 hover:underline">
+            <Link
+              href="/pricing"
+              className="font-medium text-foreground underline underline-offset-2 decoration-primary"
+            >
               Pricing
             </Link>
             . Sign in with Google when you want to save progress across sessions and use repair.
@@ -81,7 +87,7 @@ export function DiagramToolGuide() {
             href="https://mermaid.js.org/"
             target="_blank"
             rel="noreferrer"
-            className="underline underline-offset-2 hover:text-foreground"
+            className="underline underline-offset-2 decoration-primary hover:text-foreground"
           >
             Mermaid
           </a>
